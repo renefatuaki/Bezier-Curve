@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html style="margin:0 !important; padding: 0 !important">
+<head>
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.10.2/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.10.2/addons/p5.sound.min.js"></script>
+    <meta charset="utf-8" />
+    <title>Canvas</title>    
+</head>
+<body>
+	<script>
+		const width  = 800;
+		const height = 900;	  
+		const points = [];
+		let total = 4;
+		let moveP = null;
+
+		function setup() {
+			createCanvas(800, 900);        
+/*----------------------------------------
+    4 Vektoren 
+----------------------------------------*/
+			points.push(createVector(random(800), random(800))); 
+			points.push(createVector(random(800), random(800)));
+			points.push(createVector(random(800), random(800)));
+			points.push(createVector(random(800), random(800)));
+/*----------------------------------------
+    Slider 
+----------------------------------------*/
+			sliderT = createSlider(0, 1, 0.5, 0.01);
+            sliderT.position(20, 835);
+            
+            sliderDepth = createSlider(1, 9, 6, 1);
+            sliderDepth.position(sliderT.x + sliderT.width + 25, 835);
+/*----------------------------------------
+    Radio Button 
+----------------------------------------*/
+			radio = createRadio();
+			radio.option('Move CP', 'move');
+			radio.option('Add CP', 'add');
+			radio.option('Remove CP', 'remove');
+			radio.position(sliderDepth.x + sliderDepth.width + 30, 835);
+			radio.selected('move');	//automatische Auswahl
+
+		}
+
+/*----------------------------------------
+    Bonusteil 
+----------------------------------------*/
+		function mousePressed() {
+
+			/*	Hinzufügen von Kontrollpunkten mit Maus */
+			if (addingCP) {
+				if (mouseX <= 800 && mouseY <= 800) {
+					total++;
+					points.push(createVector(mouseX, mouseY));
+					addingCP = false;
+				}		
+
+			/*	Entfernen von Kontrollpunkten mit Maus */
+			} else if (deleteCP) {
+                
+					for (let i = points.length - 1; i >= 0; i--) {
+
+						let distance = dist(points[i].x, points[i].y, mouseX, mouseY);
+								
+						if (distance < 8) {
+							points.splice(i, 1);
+						}
+
+					deleteCP = false;
+				}
+
+			/*	Entfernen von Kontrollpunkten mit Maus */
+			} else if (moveCP) {
+				for (const p of points) {
+					const d = dist(p.x, p.y, mouseX, mouseY);
+					if (d < 8) {
+						moveP = p;
+					}
+				}
+			}
+		}
+
+		function mouseDragged() {
+			if (!addingCP) {
+				if (moveP) {
+				moveP.set(mouseX, mouseY);
+				}
+			}
+		}
+
+		function mouseReleased() {
+			if (!addingCP) {
+				moveP = null;
+			}
+		}
+		
+/*----------------------------------------
+	Zeichnet Hilfslinien
+    Ohne Rekursion
+----------------------------------------*/
+		function aidLine(points) {
+			
+			/*	Erhält num points und bezier_depth */
+            let t = sliderT.value();
+            let length = points.length;
+            
+            /* erhält Kopie des Arrays points mit den AnfangsPunkten */
+                let newPoints = points.slice(); 
+            
+            /* zählt schritt für schritt durch alle Punkte im Array newPoint */
+				let num = 0;
+            
+            /*verschachtelte Schleife, geht außen durch die Ebenen und erstellt für jede Ebene die Anzahl der benötigten Punkte*/
+				for (let i = 0; i < length - 1; i++) {
+
+					for (let j = i; j < length - 1; j++) {
+
+						/* gewichtete Mittelpunkte zwischen den Punkten werden gebildet */
+						newPoints.push(createVector((newPoints[num].x)*(1-t) + newPoints[num + 1].x*t,(newPoints[num].y)*(1-t) + newPoints[num + 1].y*t));
+
+					
+                            //Hilfslinien zeichnen 
+                            stroke(126);
+							line(newPoints[num].x, newPoints[num].y , newPoints[num+1].x, newPoints[num+1].y ); 
+							
+						
+						/*	Nummerierung der Unterpunkte in der entsprechenden Ebene */
+                         var numOfPoints  =  j-i;
+                        
+						namePoints(newPoints, numOfPoints, length, i);
+                       
+						
+						/*	Wird von 0 zu 1; im nächsten Durchlauf von 1 zu 2 */
+						num++;
+					}	
+                    
+                    //wird hochgezählt, damit die "nächste Ebene" von Punkten ausgelesen werden kann 
+					num++;
+                }
+                
+				//Kein rekursiver Aufruf nötig, da schon nach einem Durchlauf die Hilfslinien gezeichnet sind
+                //letzer Punkt, ist Punkt auf der Kurve -> b(T)
+                var newLength = newPoints.length-1;
+
+                let c = color('red'); 
+                fill(c); 
+                circle(newPoints[newLength].x, newPoints[newLength].y, 15);  
+                text('b(t)', newPoints[newLength].x -4 , newPoints[newLength].y + 20);
+			}   
+		
+/*----------------------------------------
+	benennt Punkte
+----------------------------------------*/
+        function namePoints(newPoints, numOfPoints, length, i){
+            
+            /*	if Bedingung um b(T) noch nicht zu beschriften */
+            if (length -2 != i) {
+                
+                circle(newPoints[newPoints.length-1].x, newPoints[newPoints.length-1].y, 8);
+                text('P' + numOfPoints , newPoints[newPoints.length-1].x + 8, newPoints[newPoints.length-1].y);
+            } else{
+                
+                /* beschriftung für b(t) versetzt anzeigen */
+                text('P' + numOfPoints , newPoints[newPoints.length-1].x +8, newPoints[newPoints.length-1].y);
+            }
+        }
+
+/*----------------------------------------
+	Zeichnet die bezier Kurve
+----------------------------------------*/
+         function bezierCurve(points, depth) {
+
+            let t = 0.5;
+            let length = points.length;
+            
+			if (depth === 0) {
+                
+                fill('black'); 
+                stroke('black');
+                strokeWeight(3);
+                line(points[0].x, points[0].y, points[length-1].x, points[length-1].y);
+                //circle(points[0].x, points[0].y, 5); 
+                
+			} else {
+
+				let newPoints = points.slice(); 
+				let num = 0;
+
+				for(let i = 0; i < length - 1; i++) {
+					
+					/*	Schleife für die Anzahl der pro Iteration erzeugten Punkte */
+					for(let j = i; j < length - 1; j++) {
+
+						/* gewichtete Mittelpunkte zwischen den Punkten werden gebildet */
+						newPoints.push(createVector((newPoints[num].x)*(1-t) + newPoints[num + 1].x*t,(newPoints[num].y)*(1-t) + newPoints[num+ 1].y*t));
+
+						num++;
+                    }
+					num++;
+                }
+                                
+                /* Arrays anlegen, um Punkte für die weitere Berechnung speichern/weitergeben zu können*/
+				let PointsLeft = Array(length);
+				let PointsRight = Array(length);
+				fillLeft = 0;
+				let fillRight = newPoints.length - 1;
+
+				/* Alle relevanten Punkte werden jeweils übergeben, 
+                bei 4 Startpunkten = PointsLeft erhält 0, 4, 7, 9 
+                Points Right erhält 9, 8, 6, 3
+                Der gewichtete Mittelpunkt wird immer an beide Arrays übergeben, in diesem Fall 9*/
+                
+				for(let i = 0; i < length; i++) {
+                    
+					PointsLeft[i] = newPoints[fillLeft];
+					fillLeft += length - i;
+
+					PointsRight[i] = newPoints[fillRight];
+					fillRight -= length - (length - i - 1);
+				}
+		
+				/* Rekursion teilt KurvenPunkte immer wieder in halbe Teilprobleme/Berechnungen auf.
+                Pro rekursivem Aufruf -> zwei weitere Aufrufe
+                depth runterzählen, dass wenn gewünschter Detailierungsgrad erreicht ist, die if Abfrage oben aufgerufen wird */
+                
+				bezierCurve(PointsLeft, depth - 1);
+				bezierCurve(PointsRight, depth - 1);
+			
+			}
+        }
+
+/*----------------------------------------
+	draw()
+    wird automatisch aufgerufen
+----------------------------------------*/
+		function draw() {
+			background(200);
+            strokeWeight(1);
+			
+			/*	Beschriftung vom Slider */
+            let valueDepth = sliderDepth.value();
+            let valueT = sliderT.value();
+            
+            text('b(t): ' + valueT , sliderT.x, 855);
+			text('Depth: ' + valueDepth, sliderDepth.x, 855);
+
+			line(0, 801, 800, 801);
+
+			/*	Beschriftung der Hauptpunkte */
+			for (const p of points) {
+				circle(p.x, p.y, 12);
+				text('P' + points.indexOf(p), p.x + 13, p.y);
+				fill(0);
+			}
+            
+			noFill();
+            
+            beginShape();
+
+			/*	Auswahl von Radio Button gibt Status für die Funktion */
+			if (radio.value() === 'move') {
+				moveCP = true;
+				addingCP = false;
+				deleteCP = false;				
+			} else if (radio.value() === 'add') {
+				moveCP = false;
+				addingCP = true;
+				deleteCP = false;				
+			} else if (radio.value() === 'remove') {
+				moveCP = false;
+				addingCP = false;
+				deleteCP = true;	
+			}
+			
+			endShape();
+            
+            let bezier_depth = sliderDepth.value();
+        
+			/*	Zeichnet Hilfslinien und T nur bis Rekursionstiefe 2-> übersichtlicher */
+            aidLine(points);
+            
+			/*	Zeichnet Curve mit Punkten, anhängig von eingestellter Rekursionstiefe */
+            bezierCurve(points, bezier_depth);
+
+		}
+	</script>	
+</body>
+</html>
